@@ -1,109 +1,148 @@
-// Variables 
-var searchButton = $(".searchButton");
-
-var apiKey = "39d568bc276783b933698b98c292edac";
-
-function renderHistory() {
-
-    //Deletes search history before adding new one to the list
-    $("#history").empty();
-
-    // Forloop for persisting the data onto HMTL page
-    for (var i = 0; i < localStorage.length; i++) {
-
-        var city = localStorage.getItem(i);
-        // console.log(localStorage.getItem("City"));
-        var cityName = $(".list-group").addClass("list-group-item");
-
-        cityName.append("<li>" + city + "</li>");
-    }
-}
-// Key count for local storage 
-var historyCount = 0;
-// Search button click event
-searchButton.click(function () {
-
-    var searchInput = $(".searchInput").val();
-
-    // Variable for current weather working 
-    var urlCurrent = "https://api.openweathermap.org/data/2.5/weather?q=" + searchInput + "&Appid=" + apiKey + "&units=imperial";
-    // Variable for 5 day forecast working
-    var urlFiveDay = "https://api.openweathermap.org/data/2.5/forecast?q=" + searchInput + "&Appid=" + apiKey + "&units=imperial";
-
-
-    if (searchInput == "") {
-        console.log(searchInput);
-    } else {
-        $.ajax({
-            url: urlCurrent,
-            method: "GET"
-        }).then(function (response) {
-            // list-group append an li to it with just set text
-            // console.log(response.name);
-            var cityName = $(".list-group").addClass("list-group-item");
-            cityName.append("<li>" + response.name + "</li>");
-            // Local storage
-            var local = localStorage.setItem(historyCount, response.name);
-            historyCount = historyCount + 1;
-
-            // Start Current Weather append 
-            var currentCard = $(".currentCard").append("<div>").addClass("card-body");
-            currentCard.empty();
-            var currentName = currentCard.append("<p>");
-            // .addClass("card-text");
-            currentCard.append(currentName);
-
-            // Adjust Date 
-            var timeUTC = new Date(response.dt * 1000);
-            currentName.append(response.name + " " + timeUTC.toLocaleDateString("en-US"));
-            currentName.append(`<img src="https://openweathermap.org/img/wn/${response.weather[0].icon}@2x.png">`);
-            // Add Temp 
-            var currentTemp = currentName.append("<p>");
-            // .addClass("card-text");
-            currentName.append(currentTemp);
-            currentTemp.append("<p>" + "Temperature: " + response.main.temp + "</p>");
-            // Add Humidity
-            currentTemp.append("<p>" + "Humidity: " + response.main.humidity + "%" + "</p>");
-            // // Add Wind Speed: 
-            currentTemp.append("<p>" + "Wind Speed: " + response.wind.speed + "</p>");
-
-            // UV Index URL
-            var urlUV = `https://api.openweathermap.org/data/2.5/uvi?appid=b8ecb570e32c2e5042581abd004b71bb&lat=${response.coord.lat}&lon=${response.coord.lon}`;
-
-            // UV Index
-            $.ajax({
-                url: urlUV,
-                method: "GET"
-            }).then(function (response) {
-
-                var currentUV = currentTemp.append("<p>" + "UV Index: " + response.value + "</p>").addClass("card-text");
-                currentUV.addClass("UV");
-                currentTemp.append(currentUV);
-                // currentUV.append("UV Index: " + response.value);
-            });
-
+// creates empty array for the search history
+var searchHistory = [];
+// returns local storage search history
+function getSearchHistory() {
+    var storedCities = JSON.parse(localStorage.getItem("searchHistory"));
+    if (storedCities !== null) {
+        searchHistory = storedCities;
+    };
+     // lists up to 8
+    for (i = 0; i < searchHistory.length; i++) {
+        //  creates links/buttons for past searched cities
+        cityListButton = $("<a>").attr({
+            class: "list-group-item list-group-item-action",
+            href: "#"
         });
-
-        // Start call for 5-day forecast 
-        $.ajax({
-            url: urlFiveDay,
-            method: "GET"
-        }).then(function (response) {
-            // Array for 5-days 
-            var day = [0, 8, 16, 24, 32];
-            var fiveDayCard = $(".fiveDayCard").addClass("card-body");
-            var fiveDayDiv = $(".fiveDayOne").addClass("card-text");
-            fiveDayDiv.empty();
-            // For each for 5 days
-            day.forEach(function (i) {
-                var FiveDayTimeUTC1 = new Date(response.list[i].dt * 1000);
-                FiveDayTimeUTC1 = FiveDayTimeUTC1.toLocaleDateString("en-US");
-
-                fiveDayDiv.append("<div class=fiveDayColor>" + "<p>" + FiveDayTimeUTC1 + "</p>" + `<img src="https://openweathermap.org/img/wn/${response.list[i].weather[0].icon}@2x.png">` + "<p>" + "Temperature: " + response.list[i].main.temp + "</p>" + "<p>" + "Humidity: " + response.list[i].main.humidity + "%" + "</p>" + "</div>");
-
-
-            })
-
-        });
+        // appends history as a button below the search field
+        cityListButton.text(searchHistory[i]);
+        $(".list-group").append(cityListButton);
     }
+};
+var city;
+var mainCard = $(".card-body");
+// invokes getItems
+getSearchHistory();
+// main card
+function getData() {
+    var queryURL = "https://api.openweathermap.org/data/2.5/weather?q=" + city + "&appid=39d568bc276783b933698b98c292edac"
+    mainCard.empty();
+    $("#weeklyForecast").empty();
+    // requests current weather from the openweathermap api
+    $.ajax({
+        url: queryURL,
+        method: "GET"
+    }).then(function (response) {
+        // using moment to craft the date
+        var date = moment().format(" MM/DD/YYYY");
+        // takes the icon code from the response and assigns it to iconCode
+        var iconCode = response.weather[0].icon;
+        // builds the main card icon url
+        var iconURL = "http://openweathermap.org/img/w/" + iconCode + ".png";
+        // takes the name added from the search and the date/format from moment and creates a single var
+        var name = $("<h3>").html(city + date);
+        // displays name in main card
+        mainCard.prepend(name);
+        // displays icon on main card
+        mainCard.append($("<img>").attr("src", iconURL));
+        // converts K and removes decimals using Math.round
+        var temp = Math.round((response.main.temp - 273.15) * 1.80 + 32);
+        mainCard.append($("<p>").html("Temperature: " + temp + " &#8457"));
+        var humidity = response.main.humidity;
+        mainCard.append($("<p>").html("Humidity: " + humidity));
+        var windSpeed = response.wind.speed;
+        mainCard.append($("<p>").html("Wind Speed: " + windSpeed));
+        // takes from the response and creates a var used in the next request for UV index
+        var lat = response.coord.lat;
+        var lon = response.coord.lon;
+        // separate request for UV index, requires lat/long
+        $.ajax({
+            url: "https://api.openweathermap.org/data/2.5/uvi?appid=642f9e3429c58101eb516d1634bdaa4b&lat=" + lat + "&lon=" + lon,
+            method: "GET"
+        // displays UV in main card
+        }).then(function (response) {
+            mainCard.append($("<p>").html("UV Index: <span>" + response.value + "</span>"));
+            // 
+            if (response.value <= 2) {
+                $("span").attr("class", "btn btn-outline-success");
+            };
+            if (response.value > 2 && response.value <= 5) {
+                $("span").attr("class", "btn btn-outline-warning");
+            };
+            if (response.value > 5) {
+                $("span").attr("class", "btn btn-outline-danger");
+            };
+        })
+        // another call for the 5-day (forecast)
+        $.ajax({
+            url: "https://api.openweathermap.org/data/2.5/forecast?q=" + city + "&appid=642f9e3429c58101eb516d1634bdaa4b",
+            method: "GET"
+        // displays 5 separate columns from the forecast response
+        }).then(function (response) {
+            for (i = 0; i < 5; i++) {
+                // creates the columns
+                var newCard = $("<div>").attr("class", "col fiveDay bg-primary text-white rounded-lg p-2");
+                $("#weeklyForecast").append(newCard);
+                // uses moment for the date
+                var myDate = new Date(response.list[i * 8].dt * 1000);
+                //console.log(myDate);
+                // displays date
+                newCard.append($("<h4>").html(myDate.toLocaleDateString()));
+                // brings back the icon url suffix
+                var iconCode = response.list[i * 8].weather[0].icon;
+                //console.log(iconCode);
+                // builds the icon URL
+                var iconURL = "http://openweathermap.org/img/w/" + iconCode + ".png";
+                // displays the icon
+                newCard.append($("<img>").attr("src", iconURL));
+                // converts K and removes decimals using Math.round
+                var temp = Math.round((response.list[i * 8].main.temp - 273.15) * 1.80 + 32);
+                // displays temp
+                newCard.append($("<p>").html("Temp: " + temp + " &#8457"));
+                // creates a var for humity from the response
+                var humidity = response.list[i * 8].main.humidity;
+                //console.log(humidity);
+                // displays humidity
+                newCard.append($("<p>").html("Humidity: " + humidity));
+            }
+        })
+    })
+};
+// searches and adds to history
+$("#searchCity").click(function(event) {
+
+    event.preventDefault();
+
+    city = $("#city").val();
+    getData();
+    var checkArray = searchHistory.includes(city);
+    //checks if the input from the search is in the searchHistory array. If true it returns nothing
+    if (checkArray == true) {
+        return
+    }
+    //else it will add the city to the searchHistory array and store it in local storage
+    else {
+        searchHistory.push(city);
+        localStorage.setItem("searchHistory", JSON.stringify(searchHistory));
+        var cityListButton = $("<a>").attr({
+            // list-group-item-action keeps the search history buttons consistent
+            class: "list-group-item list-group-item-action",
+            href: "#"
+        });
+        cityListButton.text(city);
+        $(".list-group").append(cityListButton);
+    };
+    $("#city").val('');
 });
+
+// if user clicks on searchHistory item, it will display that city's forecast
+$(".list-group-item").click(function() {
+    city = $(this).text();
+    getData();
+});
+
+//clears the searchHistory array and the localStorage
+$("#clearHistory").click(function(){
+    localStorage.clear();
+    searchHistory = [];
+    $(".list-group").empty();
+})
